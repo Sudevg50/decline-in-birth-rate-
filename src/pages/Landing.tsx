@@ -66,21 +66,6 @@ export const Landing: React.FC = () => {
           </button>
         </motion.div>
       </motion.div>
-
-      {/* Admin Panel Link */}
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ delay: 1 }}
-        className="absolute bottom-8 z-10"
-      >
-        <button
-          onClick={() => navigate('/admin')}
-          className="text-emerald-700/60 hover:text-emerald-800 text-sm font-medium transition-colors hover:underline underline-offset-4"
-        >
-          {t.adminLogin}
-        </button>
-      </motion.div>
     </div>
   );
 };
