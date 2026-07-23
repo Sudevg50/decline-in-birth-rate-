@@ -156,10 +156,10 @@ export const AdminDashboard: React.FC = () => {
         </button>
       </nav>
 
-      <main className="p-6 max-w-7xl mx-auto space-y-6">
+      <main className="p-4 sm:p-6 max-w-7xl mx-auto space-y-6">
         
         {/* Stats Grid */}
-        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4">
           <StatCard title={t.totalResponses} value={totalResponses} />
           <StatCard title={t.todayResponses} value={todayResponses} />
           <StatCard title={t.avgAge} value={avgAge} />
@@ -207,24 +207,24 @@ export const AdminDashboard: React.FC = () => {
         </div>
 
         {/* Table Section */}
-        <div className="bg-white p-6 rounded-xl shadow-sm">
-          <div className="flex justify-between items-center mb-4">
+        <div className="bg-white p-4 sm:p-6 rounded-xl shadow-sm overflow-hidden">
+          <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 mb-4">
             <h3 className="text-lg font-semibold">{t.responsesTable}</h3>
-            <div className="flex gap-2">
+            <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
               <input 
                 type="text" 
                 placeholder={t.search} 
-                className="border border-gray-300 rounded px-3 py-1 outline-none focus:ring-1 focus:ring-green-500"
+                className="border border-gray-300 rounded px-3 py-2 sm:py-1 outline-none focus:ring-1 focus:ring-green-500 w-full sm:w-auto"
                 value={searchTerm}
                 onChange={e => setSearchTerm(e.target.value)}
               />
-              <button onClick={exportCsv} className="bg-green-600 hover:bg-green-700 text-white px-4 py-1 rounded shadow-sm text-sm font-medium">
+              <button onClick={exportCsv} className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 sm:py-1 rounded shadow-sm text-sm font-medium w-full sm:w-auto">
                 {t.exportCsv}
               </button>
             </div>
           </div>
 
-          <div className="overflow-x-auto">
+          <div className="overflow-x-auto -mx-4 sm:mx-0 px-4 sm:px-0">
             <table className="min-w-full text-left text-sm text-gray-700">
               <thead className="bg-gray-50 text-gray-600 border-b">
                 <tr>
