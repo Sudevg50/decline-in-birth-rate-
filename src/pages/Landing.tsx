@@ -1,14 +1,16 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useLanguage } from '../context/LanguageContext';
-import { motion } from 'framer-motion';
+import { motion } from "framer-motion";
 
 export const Landing: React.FC = () => {
   const { t } = useLanguage();
   const navigate = useNavigate();
 
   // Staggered animation variants
-  const fadeUp = {
+ import { Variants } from "framer-motion";
+
+ const fadeUp: Variants = {
   hidden: {
     opacity: 0,
     y: 20,
