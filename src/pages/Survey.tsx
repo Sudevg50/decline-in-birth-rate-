@@ -338,8 +338,8 @@ export const Survey: React.FC = () => {
             ) : (
               <div></div>
             )}
-            <button type="submit" className="group relative inline-flex items-center justify-center px-10 py-3 text-lg font-medium text-white transition-all duration-300 ease-in-out bg-emerald-600 border border-transparent rounded-lg hover:bg-emerald-700 hover:shadow-[0_0_20px_rgba(16,185,129,0.4)] overflow-hidden" style={{ backgroundColor: 'var(--color-primary)' }}>
-              {step === 1 ? t.next : t.submit}
+            <button type="submit" disabled={isSubmitting} className="group relative inline-flex items-center justify-center px-10 py-3 text-lg font-medium text-white transition-all duration-300 ease-in-out bg-emerald-600 border border-transparent rounded-lg hover:bg-emerald-700 hover:shadow-[0_0_20px_rgba(16,185,129,0.4)] overflow-hidden disabled:opacity-60 disabled:cursor-not-allowed" style={{ backgroundColor: 'var(--color-primary)' }}>
+              {isSubmitting ? 'Submitting...' : step === 1 ? t.next : t.submit}
             </button>
           </div>
         </form>
