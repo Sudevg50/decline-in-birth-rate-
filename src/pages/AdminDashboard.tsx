@@ -40,6 +40,22 @@ export const AdminDashboard: React.FC = () => {
     navigate('/admin');
   };
 
+  const handleDelete = async (id: string) => {
+    if (!window.confirm("Are you sure you want to delete this response?")) return;
+    
+    const { error } = await supabase
+      .from('SurveyResponses')
+      .delete()
+      .eq('id', id);
+
+    if (error) {
+      console.error('Error deleting:', error.message);
+      alert('Failed to delete response. Check database permissions.');
+    } else {
+      setData(prev => prev.filter(row => row.id !== id));
+    }
+  };
+
   // Compute Stats
   const totalResponses = data.length;
   const today = new Date().toISOString().split('T')[0];
@@ -234,6 +250,7 @@ export const AdminDashboard: React.FC = () => {
                   <th className="py-3 px-4 font-semibold">Area</th>
                   <th className="py-3 px-4 font-semibold">Profession</th>
                   <th className="py-3 px-4 font-semibold">Date</th>
+                  <th className="py-3 px-4 font-semibold text-center">Action</th>
                 </tr>
               </thead>
               <tbody>
@@ -245,11 +262,22 @@ export const AdminDashboard: React.FC = () => {
                     <td className="py-2 px-4">{row.area_type}</td>
                     <td className="py-2 px-4">{row.profession}</td>
                     <td className="py-2 px-4">{new Date(row.created_at).toLocaleDateString()}</td>
+                    <td className="py-2 px-4 text-center">
+                      <button 
+                        onClick={() => handleDelete(row.id)}
+                        className="text-red-500 hover:text-red-700 hover:bg-red-50 p-1.5 rounded transition-colors"
+                        title="Delete Response"
+                      >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                        </svg>
+                      </button>
+                    </td>
                   </tr>
                 ))}
                 {filteredData.length === 0 && (
                   <tr>
-                    <td colSpan={6} className="py-4 px-4 text-center text-gray-500">No data found</td>
+                    <td colSpan={7} className="py-4 px-4 text-center text-gray-500">No data found</td>
                   </tr>
                 )}
               </tbody>
