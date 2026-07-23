@@ -19,11 +19,11 @@ type SurveyFormData = {
   question1_other?: string;
   question2: string;
   question2_other?: string;
-  question3: string[];
+  question3: string;
   question4: string;
   question4_other?: string;
   question5: string;
-  question6: string[];
+  question6: string;
   question7: string;
 };
 
@@ -34,8 +34,8 @@ export const Survey: React.FC = () => {
   const navigate = useNavigate();
   const { register, handleSubmit, watch, formState: { errors } } = useForm<SurveyFormData>({
     defaultValues: {
-      question3: [],
-      question6: [],
+      question3: '',
+      question6: '',
     }
   });
 
@@ -73,11 +73,11 @@ export const Survey: React.FC = () => {
             question1_other: data.question1_other || null,
             question2: data.question2,
             question2_other: data.question2_other || null,
-            question3: data.question3,
+            question3: data.question3 ? [data.question3] : [],
             question4: data.question4,
             question4_other: data.question4_other || null,
             question5: data.question5,
-            question6: data.question6,
+            question6: data.question6 ? [data.question6] : [],
             question7: data.question7,
           }
         ]);
@@ -264,7 +264,7 @@ export const Survey: React.FC = () => {
                     <div className="space-y-3">
                       {['financial', 'childcare', 'leave', 'education', 'housing', 'tax'].map((val) => (
                         <label key={val} className="flex items-center space-x-3 cursor-pointer">
-                          <input type="checkbox" value={val} {...register('question3', { required: t.required })} className="h-4 w-4 text-blue-600 rounded" />
+                          <input type="radio" value={val} {...register('question3', { required: t.required })} className="h-4 w-4 text-emerald-600 focus:ring-emerald-500" />
                           <span className="text-gray-700">{t.q3Options[val as keyof typeof t.q3Options]}</span>
                         </label>
                       ))}
@@ -302,7 +302,7 @@ export const Survey: React.FC = () => {
                     <div className="space-y-3">
                       {['financial', 'childcare', 'leave', 'education', 'housing', 'tax'].map((val) => (
                         <label key={val} className="flex items-center space-x-3 cursor-pointer">
-                          <input type="checkbox" value={val} {...register('question6', { required: t.required })} className="h-4 w-4 text-blue-600 rounded" />
+                          <input type="radio" value={val} {...register('question6', { required: t.required })} className="h-4 w-4 text-emerald-600 focus:ring-emerald-500" />
                           <span className="text-gray-700">{t.q6Options[val as keyof typeof t.q6Options]}</span>
                         </label>
                       ))}
