@@ -111,6 +111,14 @@ export const translations = {
     logout: 'Logout',
     responsesTable: 'All Responses',
     search: 'Search...',
+    avgCompletionTime: 'Avg. Completion Time',
+    fastestTime: 'Fastest Completion',
+    slowestTime: 'Slowest Completion',
+    latestSubmission: 'Latest Submission',
+    surveyCreatedDate: 'Survey Created',
+    startedAt: 'Started At',
+    completedAt: 'Completed At',
+    timeTaken: 'Time Taken',
   },
   ml: {
     // General
@@ -222,5 +230,13 @@ export const translations = {
     logout: 'ലോഗൗട്ട്',
     responsesTable: 'എല്ലാ പ്രതികരണങ്ങളും',
     search: 'തിരയുക...',
+    avgCompletionTime: 'ശരാശരി പൂർത്തീകരണ സമയം',
+    fastestTime: 'ഏറ്റവും വേഗത്തിലുള്ള പൂർത്തീകരണം',
+    slowestTime: 'ഏറ്റവും സാവധാനത്തിലുള്ള പൂർത്തീകരണം',
+    latestSubmission: 'അവസാന സമർപ്പണം',
+    surveyCreatedDate: 'സർവേ സൃഷ്ടിച്ചത്',
+    startedAt: 'ആരംഭിച്ചത്',
+    completedAt: 'പൂർത്തിയായത്',
+    timeTaken: 'എടുത്ത സമയം',
   }
 };

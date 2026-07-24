@@ -1,10 +1,13 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useForm } from 'react-hook-form';
 import { useNavigate } from 'react-router-dom';
 import { useLanguage } from '../context/LanguageContext';
 import { motion, AnimatePresence } from 'framer-motion';
 
 import { supabase } from '../lib/supabase';
+
+// The date this survey was deployed / "created" by the admin
+const SURVEY_CREATED_AT = '2025-01-01T00:00:00.000Z';
 
 type SurveyFormData = {
   name: string;
@@ -32,6 +35,8 @@ export const Survey: React.FC = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { t } = useLanguage();
   const navigate = useNavigate();
+  const surveyStartedAtRef = useRef<string>('');
+
   const { register, handleSubmit, watch, formState: { errors } } = useForm<SurveyFormData>({
     defaultValues: {
       question3: '',
@@ -39,11 +44,34 @@ export const Survey: React.FC = () => {
     }
   });
 
+  // ── Timestamp: record survey_started_at once, preserved across refreshes ──
+  useEffect(() => {
+    const SESSION_KEY = 'survey_started_at';
+    let startedAt = sessionStorage.getItem(SESSION_KEY);
+    if (!startedAt) {
+      startedAt = new Date().toISOString();
+      sessionStorage.setItem(SESSION_KEY, startedAt);
+    }
+    surveyStartedAtRef.current = startedAt;
+  }, []);
+
   const profession = watch('profession');
   const maritalStatus = watch('marital_status');
   const q1 = watch('question1');
   const q2 = watch('question2');
   const q4 = watch('question4');
+
+  // ── Progress tracking: count answered fields across all 13 questions ──
+  const watchedFields = watch([
+    'name', 'age', 'district', 'area_type', 'profession', 'marital_status',
+    'question1', 'question2', 'question3', 'question4', 'question5', 'question6', 'question7'
+  ]);
+  const TOTAL_QUESTIONS = 13;
+  const answeredCount = watchedFields.filter(
+    val => val !== undefined && val !== '' && val !== null && !(typeof val === 'number' && isNaN(val as number))
+  ).length;
+  const progressPercent = Math.round((answeredCount / TOTAL_QUESTIONS) * 100);
+  const isComplete = progressPercent === 100;
 
   useEffect(() => {
     window.scrollTo(0, 0);
@@ -54,8 +82,14 @@ export const Survey: React.FC = () => {
       setStep(2);
       return;
     }
-    
+
     setIsSubmitting(true);
+    const completedAt = new Date();
+    const startedAt = surveyStartedAtRef.current
+      ? new Date(surveyStartedAtRef.current)
+      : completedAt;
+    const timeTakenSeconds = Math.round((completedAt.getTime() - startedAt.getTime()) / 1000);
+
     try {
       const { error } = await supabase
         .from('SurveyResponses')
@@ -79,17 +113,23 @@ export const Survey: React.FC = () => {
             question5: data.question5,
             question6: data.question6 ? [data.question6] : [],
             question7: data.question7,
+            // Timestamps
+            survey_created_at: SURVEY_CREATED_AT,
+            survey_started_at: surveyStartedAtRef.current || startedAt.toISOString(),
+            survey_completed_at: completedAt.toISOString(),
+            time_taken_seconds: timeTakenSeconds,
           }
         ]);
-        
+
       if (error) {
         console.error('Supabase error:', error.message);
-        // Fallback or show error
       }
     } catch (err) {
       console.error('Submit error:', err);
     } finally {
       setIsSubmitting(false);
+      // Clear session start time after successful submission
+      sessionStorage.removeItem('survey_started_at');
       navigate('/thank-you');
     }
   };
@@ -106,21 +146,61 @@ export const Survey: React.FC = () => {
 
   return (
     <div className="min-h-screen animated-bg py-12 px-4 sm:px-6 lg:px-8 overflow-x-hidden relative">
+
+      {/* ── Fixed Top Progress Bar ── */}
+      <div className="fixed top-14 left-0 right-0 z-50 bg-white/90 backdrop-blur-md border-b border-gray-200/60 shadow-sm">
+        <div className="max-w-3xl mx-auto px-4 sm:px-6 py-2.5 flex items-center gap-3">
+          {/* Bar */}
+          <div className="flex-1 bg-gray-200/70 rounded-full h-2.5 overflow-hidden shadow-inner">
+            <div
+              className={`h-2.5 rounded-full transition-all duration-700 ease-out ${
+                isComplete
+                  ? 'bg-gradient-to-r from-green-500 to-emerald-400 shadow-[0_0_10px_rgba(34,197,94,0.5)]'
+                  : 'bg-gradient-to-r from-emerald-400 to-teal-500 shadow-[0_0_8px_rgba(16,185,129,0.4)]'
+              }`}
+              style={{ width: `${progressPercent}%` }}
+            />
+          </div>
+          {/* Label */}
+          <div className="shrink-0 flex items-center gap-1.5">
+            {isComplete ? (
+              <span className="text-xs font-semibold text-green-600 flex items-center gap-1">
+                <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                </svg>
+                Survey Complete
+              </span>
+            ) : (
+              <span className="text-xs font-semibold text-slate-600 tabular-nums">
+                {progressPercent}% Complete
+              </span>
+            )}
+          </div>
+        </div>
+      </div>
+
       {/* Decorative Orbs */}
       <div className="absolute top-[10%] left-[5%] w-96 h-96 bg-emerald-300 rounded-full mix-blend-multiply filter blur-3xl opacity-20 animate-blob"></div>
       <div className="absolute bottom-[10%] right-[5%] w-96 h-96 bg-teal-300 rounded-full mix-blend-multiply filter blur-3xl opacity-20 animate-blob animation-delay-4000"></div>
 
-      <div className="max-w-3xl mx-auto glass-panel rounded-2xl shadow-xl overflow-hidden relative z-10 border border-white/40">
-        
-        {/* Header & Progress */}
+      <div className="max-w-3xl mx-auto glass-panel rounded-2xl shadow-xl overflow-hidden relative z-10 border border-white/40 mt-10">
+
+        {/* Header & Inline Progress */}
         <div className="px-8 py-6 text-slate-800 border-b border-gray-100/50 bg-white/40 backdrop-blur-md">
           <h2 className="text-2xl font-bold tracking-tight">{t.landingTitle}</h2>
           <div className="mt-4 flex items-center justify-between text-sm font-medium text-slate-500">
-            <span>{step === 1 ? t.page1of2 : t.page2of2}</span>
-            <span>{step === 1 ? '50%' : '100%'}</span>
+            <span>{answeredCount} / {TOTAL_QUESTIONS} questions answered</span>
+            <span className={isComplete ? 'text-green-600 font-semibold' : ''}>{progressPercent}%</span>
           </div>
-          <div className="w-full bg-slate-200/50 rounded-full h-1.5 mt-2 overflow-hidden shadow-inner">
-            <div className="bg-gradient-to-r from-emerald-400 to-teal-500 h-1.5 rounded-full transition-all duration-500 shadow-[0_0_10px_rgba(16,185,129,0.5)]" style={{ width: step === 1 ? '50%' : '100%' }}></div>
+          <div className="w-full bg-slate-200/50 rounded-full h-2 mt-2 overflow-hidden shadow-inner">
+            <div
+              className={`h-2 rounded-full transition-all duration-500 ${
+                isComplete
+                  ? 'bg-gradient-to-r from-green-500 to-emerald-400 shadow-[0_0_10px_rgba(34,197,94,0.5)]'
+                  : 'bg-gradient-to-r from-emerald-400 to-teal-500 shadow-[0_0_10px_rgba(16,185,129,0.5)]'
+              }`}
+              style={{ width: `${progressPercent}%` }}
+            ></div>
           </div>
         </div>
 
@@ -129,7 +209,7 @@ export const Survey: React.FC = () => {
             {step === 1 && (
               <motion.div key="step1" initial="initial" animate="in" exit="out" variants={pageVariants} transition={{ duration: 0.3 }}>
                 <h3 className="text-xl font-semibold text-gray-800 mb-6 pb-2 border-b">{t.personalInfo}</h3>
-                
+
                 <div className="grid grid-cols-1 gap-6">
                   {/* Name */}
                   <div>
@@ -141,7 +221,7 @@ export const Survey: React.FC = () => {
                   {/* Age */}
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">{t.age} *</label>
-                    <input type="number" {...register('age', { 
+                    <input type="number" {...register('age', {
                       required: t.required,
                       min: { value: 18, message: t.ageMinError },
                       max: { value: 100, message: t.ageMaxError },
@@ -323,7 +403,7 @@ export const Survey: React.FC = () => {
                     </div>
                     {errors.question7 && <p className="text-red-500 text-sm mt-1">{errors.question7.message}</p>}
                   </div>
-                  
+
                 </div>
               </motion.div>
             )}

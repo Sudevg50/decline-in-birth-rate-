@@ -4,6 +4,37 @@ import { useLanguage } from '../context/LanguageContext';
 import { supabase } from '../lib/supabase';
 import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Legend } from 'recharts';
 
+// Helper: format seconds → "Xm Ys"
+const formatDuration = (seconds: number | null | undefined): string => {
+  if (seconds === null || seconds === undefined || isNaN(seconds)) return '—';
+  if (seconds < 60) return `${seconds}s`;
+  const m = Math.floor(seconds / 60);
+  const s = seconds % 60;
+  return s > 0 ? `${m}m ${s}s` : `${m}m`;
+};
+
+// Helper: format ISO timestamp for display
+const formatDateTime = (iso: string | null | undefined): string => {
+  if (!iso) return '—';
+  try {
+    return new Date(iso).toLocaleString();
+  } catch {
+    return iso;
+  }
+};
+
+// Helper: format ISO timestamp for CSV (YYYY-MM-DD HH:mm:ss)
+const formatForCsv = (iso: string | null | undefined): string => {
+  if (!iso) return '';
+  try {
+    const d = new Date(iso);
+    const pad = (n: number) => String(n).padStart(2, '0');
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+  } catch {
+    return iso;
+  }
+};
+
 export const AdminDashboard: React.FC = () => {
   const { t } = useLanguage();
   const navigate = useNavigate();
@@ -43,7 +74,7 @@ export const AdminDashboard: React.FC = () => {
 
   const confirmDelete = async () => {
     if (!deleteTargetId) return;
-    
+
     const { error } = await supabase
       .from('SurveyResponses')
       .delete()
@@ -58,13 +89,13 @@ export const AdminDashboard: React.FC = () => {
     setDeleteTargetId(null);
   };
 
-  // Compute Stats
+  // ── Compute Stats ──────────────────────────────────────────────────────────
   const totalResponses = data.length;
   const today = new Date().toISOString().split('T')[0];
   const todayResponses = data.filter(r => r.created_at?.startsWith(today)).length;
-  
-  const avgAge = totalResponses > 0 
-    ? Math.round(data.reduce((sum, r) => sum + (r.age || 0), 0) / totalResponses) 
+
+  const avgAge = totalResponses > 0
+    ? Math.round(data.reduce((sum, r) => sum + (r.age || 0), 0) / totalResponses)
     : 0;
 
   const migrationCount = data.filter(r => r.question7 === 'Yes').length;
@@ -82,7 +113,26 @@ export const AdminDashboard: React.FC = () => {
   const ruralPct = totalResponses > 0 ? Math.round((ruralCount / totalResponses) * 100) : 0;
   const semiPct = totalResponses > 0 ? Math.round((semiCount / totalResponses) * 100) : 0;
 
-  // Chart Data preparation
+  // ── Timing Stats ───────────────────────────────────────────────────────────
+  const timingData = data
+    .map(r => r.time_taken_seconds)
+    .filter((t): t is number => typeof t === 'number' && !isNaN(t) && t > 0);
+
+  const avgCompletionSecs = timingData.length > 0
+    ? Math.round(timingData.reduce((a, b) => a + b, 0) / timingData.length)
+    : null;
+  const fastestSecs = timingData.length > 0 ? Math.min(...timingData) : null;
+  const slowestSecs = timingData.length > 0 ? Math.max(...timingData) : null;
+
+  const latestSubmission = data.length > 0
+    ? formatDateTime(data[0].created_at)
+    : '—';
+
+  const surveyCreatedDate = data.find(r => r.survey_created_at)?.survey_created_at
+    ? formatDateTime(data.find(r => r.survey_created_at)!.survey_created_at)
+    : '—';
+
+  // ── Chart Data ─────────────────────────────────────────────────────────────
   const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8', '#82ca9d'];
 
   const areaTypeData = [
@@ -97,18 +147,18 @@ export const AdminDashboard: React.FC = () => {
   }, {} as any);
   const professionData = Object.keys(professionMap).map(k => ({ name: k, count: professionMap[k] }));
 
-  // Filtering for table
+  // ── Filtering ──────────────────────────────────────────────────────────────
   const filteredData = useMemo(() => {
-    return data.filter(row => 
+    return data.filter(row =>
       (row.name && row.name.toLowerCase().includes(searchTerm.toLowerCase())) ||
       (row.district && row.district.toLowerCase().includes(searchTerm.toLowerCase()))
     );
   }, [data, searchTerm]);
 
-  // Export CSV
+  // ── Export CSV ─────────────────────────────────────────────────────────────
   const exportCsv = () => {
     if (filteredData.length === 0) return;
-    
+
     const exportColumns = [
       { key: 'created_at', label: 'Date Submitted' },
       { key: 'name', label: 'Name' },
@@ -128,25 +178,35 @@ export const AdminDashboard: React.FC = () => {
       { key: 'question4_other', label: 'Q4 (Other)' },
       { key: 'question5', label: 'Q5: Personal opinion on issue' },
       { key: 'question6', label: 'Q6: Govt actions requested' },
-      { key: 'question7', label: 'Q7: Are you planning to migrate?' }
+      { key: 'question7', label: 'Q7: Are you planning to migrate?' },
+      // Timestamp columns
+      { key: 'survey_created_at', label: 'Survey Created At', isTimestamp: true },
+      { key: 'survey_started_at', label: 'Survey Started At', isTimestamp: true },
+      { key: 'survey_completed_at', label: 'Survey Completed At', isTimestamp: true },
+      { key: 'time_taken_seconds', label: 'Time Taken (Seconds)' },
     ];
 
     const headers = exportColumns.map(col => `"${col.label}"`).join(',');
-    
+
     const rows = filteredData.map(row => {
       return exportColumns.map(col => {
         let val = row[col.key];
-        
+
+        // Format timestamp columns
+        if ((col as any).isTimestamp && val) {
+          val = formatForCsv(val);
+        }
+
         // Handle arrays from multi-select questions
         if (Array.isArray(val)) {
           val = val.join('; ');
         }
-        
+
         // Handle null/undefined
         if (val === null || val === undefined) {
           val = '';
         }
-        
+
         // Escape quotes to prevent CSV breakage
         const stringVal = String(val).replace(/"/g, '""');
         return `"${stringVal}"`;
@@ -175,8 +235,8 @@ export const AdminDashboard: React.FC = () => {
       </nav>
 
       <main className="p-4 sm:p-6 max-w-7xl mx-auto space-y-6">
-        
-        {/* Stats Grid */}
+
+        {/* Stats Grid — existing */}
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4">
           <StatCard title={t.totalResponses} value={totalResponses} />
           <StatCard title={t.todayResponses} value={todayResponses} />
@@ -188,6 +248,31 @@ export const AdminDashboard: React.FC = () => {
           <StatCard title={t.ruralPct} value={`${ruralPct}%`} />
           <StatCard title={t.semiUrbanPct} value={`${semiPct}%`} />
         </div>
+
+        {/* ── Timing Stats Grid ── */}
+        <div>
+          <h2 className="text-base font-semibold text-gray-600 uppercase tracking-wider mb-3">Completion Time Analytics</h2>
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
+            <StatCard title={t.avgCompletionTime} value={formatDuration(avgCompletionSecs)} accent="blue" />
+            <StatCard title={t.fastestTime} value={formatDuration(fastestSecs)} accent="green" />
+            <StatCard title={t.slowestTime} value={formatDuration(slowestSecs)} accent="amber" />
+            <StatCard title={t.latestSubmission} value={data.length > 0 ? new Date(data[0].created_at).toLocaleDateString() : '—'} accent="purple" />
+            <StatCard title={t.surveyCreatedDate} value={surveyCreatedDate !== '—' ? new Date(data.find(r => r.survey_created_at)!.survey_created_at).toLocaleDateString() : '—'} accent="slate" />
+          </div>
+        </div>
+
+        {/* Latest Submission full timestamp */}
+        {data.length > 0 && (
+          <div className="bg-white rounded-xl shadow-sm border border-gray-100 px-6 py-4 flex flex-wrap gap-6 text-sm text-gray-600">
+            <span><span className="font-semibold text-gray-800">Latest Submission:</span> {latestSubmission}</span>
+            {data[0].survey_started_at && (
+              <span><span className="font-semibold text-gray-800">Last Started:</span> {formatDateTime(data[0].survey_started_at)}</span>
+            )}
+            {data[0].survey_completed_at && (
+              <span><span className="font-semibold text-gray-800">Last Completed:</span> {formatDateTime(data[0].survey_completed_at)}</span>
+            )}
+          </div>
+        )}
 
         {/* Charts Section */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -229,9 +314,9 @@ export const AdminDashboard: React.FC = () => {
           <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 mb-4">
             <h3 className="text-lg font-semibold">{t.responsesTable}</h3>
             <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
-              <input 
-                type="text" 
-                placeholder={t.search} 
+              <input
+                type="text"
+                placeholder={t.search}
                 className="border border-gray-300 rounded px-3 py-2 sm:py-1 outline-none focus:ring-1 focus:ring-green-500 w-full sm:w-auto"
                 value={searchTerm}
                 onChange={e => setSearchTerm(e.target.value)}
@@ -252,20 +337,36 @@ export const AdminDashboard: React.FC = () => {
                   <th className="py-3 px-4 font-semibold">Area</th>
                   <th className="py-3 px-4 font-semibold">Profession</th>
                   <th className="py-3 px-4 font-semibold">Date</th>
+                  <th className="py-3 px-4 font-semibold">{t.startedAt}</th>
+                  <th className="py-3 px-4 font-semibold">{t.completedAt}</th>
+                  <th className="py-3 px-4 font-semibold">{t.timeTaken}</th>
                   <th className="py-3 px-4 font-semibold text-center">Action</th>
                 </tr>
               </thead>
               <tbody>
                 {filteredData.slice(0, 50).map((row: any, i: number) => (
                   <tr key={i} className="border-b hover:bg-gray-50">
-                    <td className="py-2 px-4">{row.name}</td>
+                    <td className="py-2 px-4 font-medium">{row.name}</td>
                     <td className="py-2 px-4">{row.age}</td>
                     <td className="py-2 px-4">{row.district}</td>
                     <td className="py-2 px-4">{row.area_type}</td>
                     <td className="py-2 px-4">{row.profession}</td>
-                    <td className="py-2 px-4">{new Date(row.created_at).toLocaleDateString()}</td>
+                    <td className="py-2 px-4 whitespace-nowrap">{new Date(row.created_at).toLocaleDateString()}</td>
+                    <td className="py-2 px-4 whitespace-nowrap text-xs text-gray-500">
+                      {row.survey_started_at ? new Date(row.survey_started_at).toLocaleString() : '—'}
+                    </td>
+                    <td className="py-2 px-4 whitespace-nowrap text-xs text-gray-500">
+                      {row.survey_completed_at ? new Date(row.survey_completed_at).toLocaleString() : '—'}
+                    </td>
+                    <td className="py-2 px-4 whitespace-nowrap">
+                      {row.time_taken_seconds != null ? (
+                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-50 text-emerald-700 border border-emerald-100">
+                          ⏱ {formatDuration(row.time_taken_seconds)}
+                        </span>
+                      ) : '—'}
+                    </td>
                     <td className="py-2 px-4 text-center">
-                      <button 
+                      <button
                         onClick={() => setDeleteTargetId(row.id)}
                         className="text-red-500 hover:text-red-700 hover:bg-red-50 p-1.5 rounded transition-colors"
                         title="Delete Response"
@@ -279,7 +380,7 @@ export const AdminDashboard: React.FC = () => {
                 ))}
                 {filteredData.length === 0 && (
                   <tr>
-                    <td colSpan={7} className="py-4 px-4 text-center text-gray-500">No data found</td>
+                    <td colSpan={10} className="py-4 px-4 text-center text-gray-500">No data found</td>
                   </tr>
                 )}
               </tbody>
@@ -301,7 +402,7 @@ export const AdminDashboard: React.FC = () => {
               <p className="text-sm text-gray-500 mb-8 leading-relaxed">
                 Are you sure you want to delete this survey response? This action cannot be undone.
               </p>
-              
+
               <div className="flex w-full gap-3">
                 <button
                   onClick={() => setDeleteTargetId(null)}
@@ -325,9 +426,20 @@ export const AdminDashboard: React.FC = () => {
   );
 };
 
-const StatCard = ({ title, value }: { title: string, value: any }) => (
+type StatCardProps = { title: string; value: any; accent?: 'emerald' | 'blue' | 'green' | 'amber' | 'purple' | 'slate' };
+
+const accentMap: Record<string, string> = {
+  emerald: 'from-emerald-600 to-teal-500',
+  blue:    'from-blue-600 to-cyan-500',
+  green:   'from-green-600 to-emerald-500',
+  amber:   'from-amber-500 to-orange-400',
+  purple:  'from-purple-600 to-violet-500',
+  slate:   'from-slate-600 to-gray-500',
+};
+
+const StatCard = ({ title, value, accent = 'emerald' }: StatCardProps) => (
   <div className="bg-white p-5 rounded-2xl shadow-sm border border-gray-100 hover:-translate-y-1 hover:shadow-md transition-all duration-300 flex flex-col justify-center items-center">
     <h4 className="text-xs text-slate-500 uppercase tracking-wider mb-2 text-center font-medium">{title}</h4>
-    <span className="text-3xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-emerald-600 to-teal-500">{value}</span>
+    <span className={`text-3xl font-bold text-transparent bg-clip-text bg-gradient-to-r ${accentMap[accent]}`}>{value}</span>
   </div>
 );
